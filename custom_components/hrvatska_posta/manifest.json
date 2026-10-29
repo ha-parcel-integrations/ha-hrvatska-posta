@@ -1,0 +1,16 @@
+{
+  "domain": "hrvatska_posta",
+  "name": "Hrvatska po\u0161ta",
+  "codeowners": [
+    "@peter-mdf"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/ha-parcel-integrations/ha-hrvatska-posta",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/ha-parcel-integrations/ha-hrvatska-posta/issues",
+  "quality_scale": "silver",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "1.0.0"
+}
