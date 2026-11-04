@@ -1,6 +1,7 @@
 {
   "domain": "hrvatska_posta",
   "name": "Hrvatska po\u0161ta",
+  "categories": ["productivity_information"],
   "codeowners": [
     "@peter-mdf"
   ],
