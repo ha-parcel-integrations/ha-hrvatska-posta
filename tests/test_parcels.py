@@ -195,6 +195,41 @@ def test_delivered_after_a_return_started_is_returning():
     assert _normalize(rows)["status"] == ParcelStatus.RETURNING
 
 
+def test_pre_advice_after_a_delivery_starts_a_second_parcel():
+    rows = [
+        row("10.07.2025", "06:26:49", p.ANNOUNCED),
+        row("14.07.2025", "07:47:26", p.OUT_FOR_DELIVERY, "10290 ZAPREŠIĆ"),
+        row("14.07.2025", "13:16:16", p.DELIVERED, "10290 ZAPREŠIĆ"),
+        row("04.11.2026", "15:45:00", p.ACCEPTED),
+        row("04.11.2026", "18:15:19", p.ANNOUNCED),
+    ]
+    parcel = _normalize(rows, include_history=True)
+    assert parcel["status"] == ParcelStatus.REGISTERED
+    assert parcel["delivered"] is False
+    assert parcel["delivered_at"] is None
+    assert [e["status"] for e in parcel["history"]][-2:] == [
+        ParcelStatus.REGISTERED,
+        ParcelStatus.REGISTERED,
+    ]
+
+
+def test_acceptance_after_a_delivery_is_not_a_second_parcel_on_its_own():
+    rows = [
+        row("14.07.2025", "13:16:16", p.DELIVERED, "10290 ZAPREŠIĆ"),
+        row("04.11.2026", "15:45:00", p.ACCEPTED),
+    ]
+    assert _normalize(rows)["status"] == ParcelStatus.IN_TRANSIT
+
+
+def test_a_return_after_a_delivery_is_not_a_second_parcel():
+    rows = [
+        row("14.07.2025", "13:16:16", p.DELIVERED, "10290 ZAPREŠIĆ"),
+        row("16.07.2025", "09:00:00", p.RETURNING),
+        row("18.07.2025", "09:00:00", p.DELIVERED_TO_SENDER),
+    ]
+    assert _normalize(rows)["status"] == ParcelStatus.RETURNING
+
+
 def test_delivered_twice_uses_the_newest_row():
     rows = [
         row("01.05.2026", "08:00:00", p.DELIVERED),

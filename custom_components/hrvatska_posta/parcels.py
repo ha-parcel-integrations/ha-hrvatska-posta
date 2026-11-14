@@ -50,9 +50,12 @@ NEW_ISSUE_URL = (
 # English page folds two different Croatian scans into "Item received", so the
 # map must stay on the Croatian wording.
 _REDIRECTED_TO_LOCKER = "Pošiljka preusmjerena u paketomat"
+# Only ever emitted when a shipment is created, so it is the one wording that
+# can tell a second parcel on a reused number from a scan on the first one.
+_PRE_ADVICE = "Pošiljatelj je unio podatke, pošiljka još nije predana Hrvatskoj pošti"
 
 _STATUS_MAP: dict[str, ParcelStatus] = {
-    "Pošiljatelj je unio podatke, pošiljka još nije predana Hrvatskoj pošti": ParcelStatus.REGISTERED,
+    _PRE_ADVICE: ParcelStatus.REGISTERED,
     "Pošiljka je zaprimljena": ParcelStatus.REGISTERED,
     "Pošiljka je prispjela": ParcelStatus.IN_TRANSIT,
     "Pošiljka je u pripremi za otpremu": ParcelStatus.IN_TRANSIT,
@@ -242,7 +245,9 @@ def _walk_rows(rows: list[dict]) -> list[dict]:
     The page groups scans by milestone and shares seconds between them, so
     ties on the clock fall back to reverse page position. Once a return has
     started, a later delivered, out-for-delivery or pickup scan belongs to the
-    return leg (the sender's office) and is not forward progress.
+    return leg (the sender's office) and is not forward progress. A pre-advice
+    after a delivery is a second parcel on a reused number and starts the walk
+    over.
     """
     dated = []
     for index, row in enumerate(rows):
@@ -254,12 +259,24 @@ def _walk_rows(rows: list[dict]) -> list[dict]:
     walked: list[dict] = []
     return_started = False
     moving = False
+    delivered_seen = False
     previous: ParcelStatus | None = None
-    for moment, _, row in dated:
+    for position, (moment, _, row) in enumerate(dated):
         wording = row["wording"]
         status = _STATUS_MAP.get(wording)
         if status is None:
             _warn_unmapped_status(wording)
+        if (
+            status is ParcelStatus.REGISTERED
+            and delivered_seen
+            and any(later["wording"] == _PRE_ADVICE for _, _, later in dated[position:])
+        ):
+            # A finished shipment keeps its scans on the page when the number is
+            # handed out again, so everything before here is another parcel.
+            return_started = False
+            moving = False
+            delivered_seen = False
+            previous = None
         entry = {
             "moment": moment,
             "wording": wording,
@@ -280,6 +297,8 @@ def _walk_rows(rows: list[dict]) -> list[dict]:
                 return_started = True
             if entry["status"] in _MOVING:
                 moving = True
+            if entry["status"] is ParcelStatus.DELIVERED:
+                delivered_seen = True
             previous = status
         walked.append(entry)
     return walked

@@ -184,6 +184,7 @@ logger:
 - **A parcel shows `unknown`** — Hrvatska pošta has no data for the code yet, or the code is wrong. It picks up automatically once the parcel is scanned.
 - **A parcel stopped updating** — Hrvatska pošta drops the history of old parcels. The last known status stays visible.
 - **A parcel delivered, then sent back** — once a parcel is delivered it is not checked again, so a return that happens afterwards is not picked up.
+- **The tracking page says delivered, Home Assistant does not** — postal numbers are handed out again after a year or so, and the tracking page then keeps both shipments' scans while its own headline still shows the first one's outcome. Home Assistant follows the newest scans, so a number that is in use again reads as the new parcel.
 - **A status logs "Unrecognised Hrvatska pošta status"** — please [open an issue](https://github.com/ha-parcel-integrations/ha-hrvatska-posta/issues/new?template=unrecognised_status.yml) with the logged line so the mapping can be extended. Customs, loss, damage, hold and cash-on-delivery scans have not been seen yet, so those are the likeliest to show up.
 
 ## Related integrations

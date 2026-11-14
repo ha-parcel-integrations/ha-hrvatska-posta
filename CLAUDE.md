@@ -67,6 +67,15 @@ you act in one of these areas:
   newest row whose wording maps; an unmapped wording warns once (naming the
   wording, never the location or code) and the parcel falls back to the newest
   mappable row, then `unknown`.
+- **Reused numbers:** the page keeps a finished shipment's scans when the
+  number is handed out again, and its headline then shows the first
+  shipment's milestone stamped with the newest scan's clock (`Uručeno` on a
+  parcel whose newest scan is a pre-advice) — another reason the headline is
+  never status. A pre-advice wording after a delivered row starts a new leg:
+  `_walk_rows` resets its return/moving/`previous` state there, so the new
+  parcel reads `registered` instead of being promoted to `in_transit` by the
+  rule below. Acceptance alone does not start a leg — it also appears on an
+  inbound item and on a return.
 - **Return sequence:** once a return-to-sender row exists, a later delivered,
   out-for-delivery or pickup-notice row belongs to the return leg and becomes `returning`. An acceptance or
   announcement row after the parcel was already moving (an inbound item
