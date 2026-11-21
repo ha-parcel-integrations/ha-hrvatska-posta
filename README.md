@@ -135,7 +135,7 @@ The `status` field is the carrier-agnostic enum shared by the whole integration 
 | `out_for_delivery` | Out for delivery to your address |
 | `at_pickup_point` | Waiting at a post office, or handed over to a parcel locker |
 | `delivered` | Delivered |
-| `returning` | Going back to the sender, or already delivered back to the sender |
+| `returning` | Going back to the sender, including once it is back at the sender |
 | `problem` | A delivery attempt failed, or the parcel was not collected |
 | `unknown` | Not yet known to Hrvatska pošta, or a status we have not mapped yet |
 

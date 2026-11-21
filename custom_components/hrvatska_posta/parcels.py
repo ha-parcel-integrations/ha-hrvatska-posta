@@ -15,7 +15,8 @@ and should be left alone.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from collections.abc import Iterable
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 import logging
 import re
 from typing import Any
@@ -331,18 +332,105 @@ def tracking_url(tracking_code: str | None) -> str | None:
     return TRACKING_URL.format(tracking_code=tracking_code)
 
 
-def _headed_for_pickup_point(walked: list[dict], status: ParcelStatus) -> bool:
-    """Whether an undelivered parcel is going to, or waiting at, a pickup point.
+def _moment(value: Any, zone: tzinfo) -> tuple[datetime, bool, str] | None:
+    """Return ``(aware datetime, date_only, text)`` for a carrier time, or ``None``.
 
-    The locker redirect is the one signal before arrival; a post-office pickup
-    notice only appears once the parcel is already there.
+    A naive time or a bare date gets ``zone``; an aware time keeps its offset
+    and, when it came in as a string, its own spelling.
     """
-    if status in (ParcelStatus.DELIVERED, ParcelStatus.RETURNING):
-        return False
-    return any(
-        entry["wording"] == _REDIRECTED_TO_LOCKER
-        or entry["status"] is ParcelStatus.AT_PICKUP_POINT
-        for entry in walked
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, date):
+        moment = datetime.combine(value, time.min, tzinfo=zone)
+        return moment, True, moment.isoformat()
+    elif isinstance(value, str) and value:
+        try:
+            if len(value) == 10:
+                moment = datetime.combine(
+                    date.fromisoformat(value), time.min, tzinfo=zone
+                )
+                return moment, True, moment.isoformat()
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        if parsed.tzinfo:
+            return parsed, False, value
+    else:
+        return None
+    moment = parsed if parsed.tzinfo else parsed.replace(tzinfo=zone)
+    return moment, False, moment.isoformat()
+
+
+def _end_of_day(moment: datetime, zone: tzinfo) -> datetime:
+    local = moment.astimezone(zone)
+    return datetime.combine(local.date(), time(23, 59, 59), tzinfo=zone)
+
+
+def planned_window(
+    start: Any, end: Any, *, zone: tzinfo
+) -> tuple[str | None, str | None]:
+    """Return ``(planned_from, planned_to)`` in the canonical window shape.
+
+    ``start`` and ``end`` are ISO strings, dates or datetimes, or ``None``; an
+    epoch number must be converted first (see ``to_iso_timestamp``). A window
+    keeps both ends. One moment with a time ends at ``23:59:59`` the same local
+    day; a date covers ``00:00:00`` to ``23:59:59``; two dates run from the
+    first day's start to the last day's end. Equal values are one moment,
+    reversed values are swapped, and ``planned_to`` is never set without
+    ``planned_from``. ``zone`` is the carrier's own zone: it dates naive times
+    and bare dates and decides which day a moment ends on, so a ``Z`` moment
+    still ends on the carrier's local day. When nothing is left of that day
+    after the moment, there is no ``planned_to``.
+    """
+    first = _moment(start, zone)
+    last = _moment(end, zone)
+    if first is None:
+        first, last = last, None
+    if first is None:
+        return None, None
+
+    def closing(moment: tuple[datetime, bool, str]) -> datetime:
+        return _end_of_day(moment[0], zone) if moment[1] else moment[0]
+
+    if last is not None and closing(last) < first[0]:
+        first, last = last, first
+    if last is not None and closing(last) == first[0]:
+        last = None
+
+    if last is None:
+        end_of_day = _end_of_day(first[0], zone)
+        return first[2], end_of_day.isoformat() if end_of_day > first[0] else None
+    return first[2], closing(last).isoformat() if last[1] else last[2]
+
+
+_NO_WINDOW_STATUSES = frozenset(
+    {ParcelStatus.AT_PICKUP_POINT, ParcelStatus.RETURNING, ParcelStatus.DELIVERED}
+)
+
+
+def planned_for_status(
+    status: ParcelStatus, planned_from: str | None, planned_to: str | None
+) -> tuple[str | None, str | None]:
+    """Empty the delivery window once the parcel is at its destination or done."""
+    if status in _NO_WINDOW_STATUSES:
+        return None, None
+    return planned_from, planned_to
+
+
+def is_pickup(
+    route_flag: bool | None,
+    status: ParcelStatus,
+    event_statuses: Iterable[ParcelStatus | None] = (),
+) -> bool:
+    """Whether the delivery route ends at a pickup point.
+
+    The carrier's own route flag wins; otherwise the parcel having reached
+    ``AT_PICKUP_POINT`` at any point counts, so the value survives collection.
+    """
+    if route_flag:
+        return True
+    return status is ParcelStatus.AT_PICKUP_POINT or any(
+        event is ParcelStatus.AT_PICKUP_POINT for event in event_statuses
     )
 
 
@@ -367,13 +455,14 @@ def normalize_parcel(raw: dict, *, include_history: bool = False) -> dict:
     newest = mapped[-1] if mapped else None
     status = newest["status"] if newest else ParcelStatus.UNKNOWN
     delivered = status is ParcelStatus.DELIVERED
-
+    planned_from, planned_to = planned_for_status(status, None, None)
+    pickup = is_pickup(
+        any(entry["wording"] == _REDIRECTED_TO_LOCKER for entry in walked),
+        status,
+        [entry["status"] for entry in walked],
+    )
     pickup_point = None
-    if status is ParcelStatus.AT_PICKUP_POINT or (
-        delivered
-        and newest is not None
-        and newest["previous"] is ParcelStatus.AT_PICKUP_POINT
-    ):
+    if pickup:
         at_point = [e for e in mapped if e["status"] is ParcelStatus.AT_PICKUP_POINT]
         pickup_point = _pickup_name(at_point[-1]["location"]) if at_point else None
 
@@ -387,9 +476,9 @@ def normalize_parcel(raw: dict, *, include_history: bool = False) -> dict:
         "raw_status": walked[-1]["wording"] if walked else None,
         "delivered": delivered,
         "delivered_at": newest["moment"].isoformat() if delivered and newest else None,
-        "planned_from": None,
-        "planned_to": None,
-        "pickup": _headed_for_pickup_point(walked, status),
+        "planned_from": planned_from,
+        "planned_to": planned_to,
+        "pickup": pickup,
         "pickup_point": pickup_point,
         "url": tracking_url(tracking_code),
         "weight": grams / 1000 if grams is not None else None,

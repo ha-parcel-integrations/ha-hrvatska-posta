@@ -140,7 +140,7 @@ def test_same_second_tie_is_broken_by_reverse_page_position():
     assert flipped["status"] == ParcelStatus.PROBLEM
 
 
-def test_full_return_never_counts_as_delivered():
+def test_a_return_back_at_the_sender_stays_returning_and_undelivered():
     parcel = _normalize(p.RETURN_ROWS)
     assert parcel["status"] == ParcelStatus.RETURNING
     assert parcel["delivered"] is False
@@ -266,14 +266,30 @@ def test_plain_home_delivery_is_not_headed_for_a_pickup_point():
     assert _normalize(p.HOME_ROWS)["pickup"] is False
 
 
-def test_a_return_is_not_headed_for_a_pickup_point():
-    assert _normalize(p.RETURN_ROWS)["pickup"] is False
+def test_a_return_that_was_at_a_pickup_point_stays_pickup():
+    parcel = _normalize(p.RETURN_ROWS)
+    assert parcel["pickup"] is True
+    assert parcel["pickup_point"] == "OFFICE"
+
+
+def test_a_return_without_a_pickup_point_is_not_pickup():
+    rows = [row("01.05.2026", "08:00:00", p.RETURNING, "10000 OFFICE")]
+    parcel = _normalize(rows)
+    assert parcel["pickup"] is False
+    assert parcel["pickup_point"] is None
+
+
+def test_a_return_still_on_its_way_is_not_delivered():
+    rows = [row("01.05.2026", "08:00:00", p.RETURNING, "10000 OFFICE")]
+    parcel = _normalize(rows)
+    assert parcel["delivered"] is False
+    assert parcel["delivered_at"] is None
 
 
 def test_locker_delivery_keeps_the_pickup_point():
     parcel = _normalize(p.LOCKER_ROWS)
     assert parcel["status"] == ParcelStatus.DELIVERED
-    assert parcel["pickup"] is False
+    assert parcel["pickup"] is True
     assert parcel["pickup_point"] == "LOCKER"
 
 

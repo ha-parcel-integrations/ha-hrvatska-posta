@@ -35,10 +35,11 @@ you act in one of these areas:
   summary+diagnostic sensors. Add a new non-parcel sensor's unique_id to the set.
 - **Per-parcel sensors are removed by the summary sensor** via
   `entity_registry.async_remove` (self-removal races and leaves ghosts).
-- **The optional pickup-point summaries are a pair.** A carrier that can tell
-  a parcel is destined for a pickup point exposes
-  `en_route_to_pickup_point` for `pickup is true` before it arrives; one that
-  can reach `ParcelStatus.AT_PICKUP_POINT` also exposes `awaiting_pickup`.
+- **The pickup-point summaries are a pair.** A carrier that can deliver to a
+  pickup point or locker exposes both `en_route_to_pickup_point` and
+  `awaiting_pickup`, even before a real parcel has shown the status or flag
+  (they read 0 until then; record it in `PENDING_*`). A carrier without pickup
+  points exposes neither and keeps `pickup` constantly False.
   See *Parcel contract* in `CONVENTIONS.md`. Say "pickup point", not
   "ServicePoint"/"parcel shop"/"locker", for the generic concept; the
   example carrier demonstrates both canonical sensors.
@@ -88,13 +89,21 @@ you act in one of these areas:
   has exactly one, else Zagreb.
 - **`None` on purpose:** sender, receiver, `planned_from`/`planned_to`,
   dimensions (the page shows none). Weight `0 g` is reported as `0.0`; only an absent weight is `None`.
-  `pickup_point` is the office or locker name without its postcode, set while
-  at a pickup point and after delivery from one. `CAPABILITIES` is `weight`,
+  `pickup_point` is the office or locker name without its postcode, set whenever `pickup` is true and
+  the point is known. `CAPABILITIES` is `weight`,
   `pickup_point`, `url` and `history`.
-- **`pickup`** is true for an undelivered, not-returning parcel that was
-  redirected to a parcel locker or has a pickup notice. The locker redirect is
-  the only signal before arrival, so it feeds `en_route_to_pickup_point`; a
-  post-office pickup notice only appears once the parcel is already there.
+- **`pickup`** follows the route: true once the parcel was redirected to a
+  parcel locker or reached a pickup point, and it stays true after collection
+  and during a return. The locker redirect is the only signal before arrival,
+  so it feeds `en_route_to_pickup_point`; a post-office pickup notice only
+  appears once the parcel is already there. A pickup notice after a return
+  started is the sender's office and does not count.
+- **Delivered:** only `delivered`. The row "uručena pošiljatelju" (back at the
+  sender) maps to `returning` with `delivered` false, so the parcel keeps being
+  polled; the contract would count it as delivered at the sender, but its
+  wording is unconfirmed. Count it as delivered once a real return confirms it.
+- **Pending evidence:** no real parcel has shown a locker redirect or a
+  back-at-sender row yet, so both are built on the page's wording only.
 - **Outgoing parcels are not built:** the page cannot tell a sent parcel from a
   received one and no direction decision was made for this carrier; add the
   two-list split from the section below if that changes.
