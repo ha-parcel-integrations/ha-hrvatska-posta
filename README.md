@@ -37,6 +37,7 @@ A custom Home Assistant integration that tracks your [Hrvatska pošta](https://w
 - Per-parcel sensor with the canonical status (`registered` / `in_transit` / `out_for_delivery` / `delivered` / …), the carrier's own status text, the pickup post office or parcel locker, the weight and a tracking deep-link
 - Summary sensors: incoming parcels, next delivery, recently delivered parcels
 - `hrvatska_posta.track_parcel` / `hrvatska_posta.untrack_parcel` services, so a dashboard button can add a parcel
+- A `contents` note on what is in a parcel, set with `hrvatska_posta.update_contents`; it titles the calendar event and shows on the next-delivery sensor
 - Events + device triggers for no-code automations (parcel registered, status changed, delivered)
 - Opt-in per-parcel status history
 - Manual refresh button and a diagnostic last-update sensor
@@ -157,8 +158,11 @@ Every payload is the full normalised parcel plus the hub's `device_id`. Events a
 
 | Service | Fields | Description |
 |---|---|---|
-| `hrvatska_posta.track_parcel` | `tracking_code` | Start tracking a parcel |
+| `hrvatska_posta.track_parcel` | `tracking_code`, `contents` (optional) | Start tracking a parcel |
 | `hrvatska_posta.untrack_parcel` | `tracking_code` | Stop tracking a parcel |
+| `hrvatska_posta.update_contents` | `tracking_code`, `contents` | Set, replace or clear (empty text) a note on what is in a parcel |
+
+The `contents` text is stored locally, never sent to Hrvatska pošta, and fills the parcel's `contents` field; it titles the parcel's calendar event and shows on the next-delivery sensor.
 
 ## Examples
 

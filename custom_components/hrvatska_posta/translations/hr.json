@@ -88,6 +88,10 @@
         "tracking_code": {
           "name": "Broj za praćenje",
           "description": "Broj za praćenje Hrvatske pošte."
+        },
+        "contents": {
+          "name": "Sadržaj",
+          "description": "Što je u paketu, vlastitim riječima. Ponovni poziv za praćeni paket zamjenjuje sadržaj; prazan tekst ga briše."
         }
       }
     },
@@ -98,6 +102,20 @@
         "tracking_code": {
           "name": "Broj za praćenje",
           "description": "Broj za praćenje Hrvatske pošte koji se više ne prati."
+        }
+      }
+    },
+    "update_contents": {
+      "name": "Ažuriraj sadržaj paketa",
+      "description": "Vlastitim riječima postavite što je u paketu s ovim kodom za praćenje. Prazan tekst briše sadržaj.",
+      "fields": {
+        "tracking_code": {
+          "name": "Broj za praćenje",
+          "description": "Broj za praćenje Hrvatske pošte."
+        },
+        "contents": {
+          "name": "Sadržaj",
+          "description": "Što je u paketu, vlastitim riječima. Prazan tekst ga briše."
         }
       }
     }
